@@ -4,7 +4,7 @@
 #include "Character/PushCharacter.h"
 #include "Widgets/WDG_EffectBase.h"
 #include "HUD/MainHUD.h"
-
+#include "Net/UnrealNetwork.h"
 
 ARing::ARing()
 {
@@ -44,6 +44,14 @@ void ARing::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	GetWorldTimerManager().ClearTimer(TimerHandle);
 }
 
+void ARing::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ARing, RingCapsule);
+	DOREPLIFETIME(ARing, RingMesh);
+}
+
 void ARing::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -74,7 +82,7 @@ void ARing::Tick(float DeltaTime)
 
 void ARing::Shrink(float InRadius, float InTime)
 {
-	DeltaRadius = (RingCapsule->GetUnscaledCapsuleRadius() - InRadius) / (InTime * 100);
+	DeltaRadius = (RingCapsule->GetUnscaledCapsuleRadius() - InRadius) / (InTime * (float)100);
 	TargetRadius = InRadius;
 	GetWorldTimerManager().SetTimer(TimerHandle, this, &ARing::ChangeRadius, 0.01f, true, 0.0f);
 }
@@ -82,7 +90,8 @@ void ARing::Shrink(float InRadius, float InTime)
 void ARing::ChangeRadius()
 {
 	float radius = RingCapsule->GetUnscaledCapsuleRadius() - DeltaRadius;
-	RingCapsule->SetCapsuleRadius(radius);
+
+	SetCapsuleRadius_NMC(radius);
 
 	if (FMath::IsNearlyEqual(radius, TargetRadius))
 		GetWorldTimerManager().ClearTimer(TimerHandle);
@@ -102,10 +111,21 @@ void ARing::Refresh()
 
 void ARing::Reset()
 {
-	RingCapsule->SetCapsuleRadius(StartRadius);
+	GetWorldTimerManager().ClearTimer(TimerHandle);
+
+	SetCapsuleRadius_NMC(StartRadius);
 
 	float scale = StartRadius / Base;
+
+	OverlappedCharacters.Empty();
+
 	RingMesh->SetWorldScale3D(FVector(scale, scale, scale * 100));
+
+}
+
+void ARing::SetCapsuleRadius_NMC_Implementation(float InRadius)
+{
+	RingCapsule->SetCapsuleRadius(InRadius);
 }
 
 void ARing::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
